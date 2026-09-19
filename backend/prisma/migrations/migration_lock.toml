@@ -1,0 +1,5 @@
+# Berkas ini dihasilkan Prisma dan harus ikut masuk version control.
+# Isinya mengunci penyedia database agar migrasi tidak dijalankan
+# terhadap jenis database yang berbeda.
+
+provider = "postgresql"

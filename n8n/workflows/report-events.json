@@ -1,0 +1,160 @@
+{
+  "name": "Sistem Pelaporan Konten — Notifikasi Admin",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "report-events",
+        "responseMode": "responseNode",
+        "options": { "rawBody": true }
+      },
+      "id": "webhook-report-events",
+      "name": "Terima event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-420, 300],
+      "webhookId": "report-events"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Verifikasi tanda tangan HMAC dan usia timestamp (BRD 4.4, AC-31).\n// Secret diambil dari environment n8n, tidak ditulis di dalam alur ini.\nconst crypto = require('crypto');\n\nconst SECRET = $env.N8N_HMAC_SECRET;\nconst TOLERANCE_SECONDS = Number($env.N8N_TIMESTAMP_TOLERANCE_SECONDS || 300);\n\nif (!SECRET) {\n  throw new Error('N8N_HMAC_SECRET belum diisi pada environment n8n.');\n}\n\nconst item = $input.first();\nconst headers = item.json.headers || {};\nconst rawBody = item.json.body;\nconst bodyText = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);\n\nconst signature = headers['x-signature'];\nconst timestamp = headers['x-timestamp'];\n\nif (!signature || !timestamp) {\n  return [{ json: { ok: false, status: 401, reason: 'header tanda tangan tidak lengkap' } }];\n}\n\nconst skew = Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp));\nif (!Number.isFinite(skew) || skew > TOLERANCE_SECONDS) {\n  return [{ json: { ok: false, status: 401, reason: `selisih waktu ${skew} detik` } }];\n}\n\nconst expected = crypto\n  .createHmac('sha256', SECRET)\n  .update(`${timestamp}.${bodyText}`)\n  .digest('hex');\n\nconst a = Buffer.from(expected);\nconst b = Buffer.from(String(signature));\nconst valid = a.length === b.length && crypto.timingSafeEqual(a, b);\n\nif (!valid) {\n  return [{ json: { ok: false, status: 401, reason: 'tanda tangan tidak cocok' } }];\n}\n\nconst payload = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;\n\nreturn [{ json: { ok: true, status: 200, payload } }];"
+      },
+      "id": "verify-signature",
+      "name": "Verifikasi HMAC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-200, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "gate-valid",
+      "name": "Tanda tangan sah?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [20, 300]
+    },
+    {
+      "parameters": {
+        "mode": "removeDuplicates",
+        "options": {}
+      },
+      "id": "dedupe",
+      "name": "Dedupe event_id",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [240, 200],
+      "notes": "Deduplikasi berdasarkan payload.event_id. Pengiriman ulang tidak menghasilkan notifikasi kedua, tetapi tetap dibalas 200 agar pengirim berhenti mencoba."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.ADMIN_NOTIFICATION_EMAIL }}",
+        "subject": "=[{{ $json.payload.event_type }}] {{ $json.payload.report_code }}",
+        "emailFormat": "text",
+        "message": "=Event  : {{ $json.payload.event_type }}\nReport : {{ $json.payload.report_code }}\nStatus : {{ $json.payload.status }}\nWaktu  : {{ $json.payload.occurred_at }}\n\nBuka detail (perlu login): {{ $json.payload.link }}\n\nPayload ini sengaja minimal — tidak memuat URL target, isi evidence, nama, maupun email.",
+        "options": {}
+      },
+      "id": "channel-email",
+      "name": "Email admin",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [500, 60],
+      "notes": "Ganti kredensial SMTP di pengaturan node. Domain pengirim wajib punya SPF, DKIM, dan DMARC aktif."
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $env.WHATSAPP_PHONE_NUMBER_ID }}",
+        "recipientPhoneNumber": "={{ $env.ADMIN_WHATSAPP_NUMBER }}",
+        "textBody": "=[{{ $json.payload.event_type }}] {{ $json.payload.report_code }} — {{ $json.payload.status }}. Buka: {{ $json.payload.link }}",
+        "additionalFields": {}
+      },
+      "id": "channel-whatsapp",
+      "name": "WhatsApp admin",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [500, 240],
+      "notes": "WhatsApp Business Platform resmi. Library tidak resmi tidak dipakai (BRD 4.4)."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.ADMIN_TELEGRAM_CHAT_ID }}",
+        "text": "=[{{ $json.payload.event_type }}] {{ $json.payload.report_code }} — {{ $json.payload.status }}\n{{ $json.payload.link }}",
+        "additionalFields": { "disable_web_page_preview": true }
+      },
+      "id": "channel-telegram",
+      "name": "Telegram admin",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [500, 420],
+      "notes": "Telegram Bot API resmi."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"received\": true } }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-ok",
+      "name": "Balas 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [760, 240]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Unauthorized\", \"reason\": $json.reason } }}",
+        "options": { "responseCode": 401 }
+      },
+      "id": "respond-unauthorized",
+      "name": "Balas 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [240, 440]
+    }
+  ],
+  "connections": {
+    "Terima event": { "main": [[{ "node": "Verifikasi HMAC", "type": "main", "index": 0 }]] },
+    "Verifikasi HMAC": { "main": [[{ "node": "Tanda tangan sah?", "type": "main", "index": 0 }]] },
+    "Tanda tangan sah?": {
+      "main": [
+        [{ "node": "Dedupe event_id", "type": "main", "index": 0 }],
+        [{ "node": "Balas 401", "type": "main", "index": 0 }]
+      ]
+    },
+    "Dedupe event_id": {
+      "main": [
+        [
+          { "node": "Email admin", "type": "main", "index": 0 },
+          { "node": "WhatsApp admin", "type": "main", "index": 0 },
+          { "node": "Telegram admin", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Email admin": { "main": [[{ "node": "Balas 200", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false,
+    "executionTimeout": 60
+  },
+  "meta": {
+    "description": "Menerima event dari worker, memverifikasi HMAC dan usia timestamp, melakukan deduplikasi berdasarkan event_id, lalu menyebarkan ke kanal admin. Penyimpanan data eksekusi dibatasi hanya saat error (BRD 4.4)."
+  },
+  "tags": [{ "name": "sistem-pelaporan-konten" }]
+}

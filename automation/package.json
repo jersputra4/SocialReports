@@ -1,0 +1,19 @@
+{
+  "name": "automation-simulator",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Simulator n8n untuk notifikasi admin (BRD/SRS v1.1 §4.4)",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "start:dev": "ts-node src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "22.7.4",
+    "ts-node": "10.9.2",
+    "typescript": "5.6.2"
+  }
+}

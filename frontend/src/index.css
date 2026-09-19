@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-plane text-ink font-sans antialiased;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  /* Fokus terlihat jelas untuk navigasi papan ketik. */
+  :focus-visible {
+    outline: 2px solid theme('colors.accent.600');
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Kolom angka disejajarkan; angka besar berdiri sendiri memakai
+     figur proporsional agar tidak terlihat renggang. */
+  th, td.numeric {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-hairline rounded-card shadow-card;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-ink-secondary mb-1.5;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-baseline bg-surface px-3 py-2 text-sm
+           placeholder:text-ink-muted
+           focus:border-accent-600 focus:outline-none focus:ring-2 focus:ring-accent-200;
+  }
+
+  .input-error {
+    @apply border-status-critical focus:border-status-critical focus:ring-red-100;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2
+           text-sm font-semibold transition-colors
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent-600 text-white hover:bg-accent-700;
+  }
+
+  .btn-secondary {
+    @apply btn border border-baseline bg-surface text-ink hover:bg-plane;
+  }
+
+  .btn-danger {
+    @apply btn bg-status-critical text-white hover:brightness-95;
+  }
+
+  .btn-ghost {
+    @apply btn text-ink-secondary hover:bg-plane;
+  }
+
+  .table-wrap {
+    @apply overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0;
+  }
+
+  .data-table {
+    @apply w-full min-w-[640px] text-sm;
+  }
+
+  .data-table thead th {
+    @apply text-left text-xs font-semibold uppercase tracking-wide text-ink-muted
+           border-b border-hairline pb-2 px-3;
+  }
+
+  .data-table tbody td {
+    @apply border-b border-hairline py-3 px-3 align-top;
+  }
+
+  .data-table tbody tr:hover {
+    @apply bg-plane;
+  }
+}
+
+/* Cetakan rapi untuk halaman detail report. */
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+}
