@@ -115,6 +115,47 @@ export class KomdigiForwardService {
     };
   }
 
+  /**
+   * Merender surat persis seperti yang akan dikirim, tanpa mengirim apa pun.
+   *
+   * Sengaja memakai jalur data yang sama dengan `forward`, termasuk hasil gate
+   * untuk memilih pasal yang dikutip. Kalau report belum memenuhi syarat,
+   * suratnya tetap dirender apa adanya — admin justru perlu melihat bentuk
+   * kekurangannya, bukan pratinjau yang dipercantik.
+   *
+   * Tidak dibatasi status tertentu, supaya surat yang sudah terkirim tetap
+   * dapat dibaca ulang. Hasil render ulang ini dapat dibandingkan dengan
+   * `complaint_submissions.payload_hash` untuk memastikan isinya sama.
+   */
+  async renderPreviewLetter(
+    reportCode: string,
+  ): Promise<{ buffer: Buffer; letterNumber: string }> {
+    const report = await this.loadReport(reportCode);
+    const row = this.toRow(report);
+
+    const eligibility = evaluateKomdigiEligibility(toEligibilityInput(row));
+    const attempt = Math.max(1, await this.countSubmissions(report.id));
+    const letterDate = new Date();
+    const letterNumber = formatKomdigiLetterNumber({
+      reportCode: report.reportCode,
+      attempt,
+      date: letterDate,
+    });
+
+    const buffer = await this.documents.renderKomdigiLetter(
+      toLetterData({
+        report: row,
+        sender: this.senderIdentity(),
+        letterNumber,
+        letterDate,
+        citedArticles: eligibility.citedArticles,
+        generatedAt: letterDate,
+      }),
+    );
+
+    return { buffer, letterNumber };
+  }
+
   // -------------------------------------------------------------- kirim -----
 
   async forward(input: {

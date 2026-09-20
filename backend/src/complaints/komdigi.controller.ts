@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Post, StreamableFile } from '@nestjs/common';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { AuthenticatedUser } from '../common/security/auth.types';
 import {
@@ -35,6 +35,31 @@ export class KomdigiController {
   @RequirePermissions('report.fulfill')
   preview(@Param('reportCode') reportCode: string) {
     return this.forward.preview(reportCode);
+  }
+
+  /**
+   * Pratinjau surat sebagai PDF, tanpa mengirim apa pun.
+   *
+   * Dibuka langsung di peramban, bukan diunduh, supaya admin dapat membaca
+   * surat sebelum menekan kirim. Isinya dirender dari data yang sama dengan
+   * pengiriman sungguhan, termasuk pasal yang lolos gate, sehingga yang
+   * terbaca di sini adalah yang benar-benar akan dikirim.
+   *
+   * Tidak dibatasi status `APPROVED`: surat yang sudah terkirim tetap dapat
+   * dibaca ulang untuk keperluan telusur.
+   */
+  @Get('letter')
+  @RequirePermissions('report.fulfill')
+  @Header('Content-Type', 'application/pdf')
+  @Header('Cache-Control', 'no-store')
+  async letter(@Param('reportCode') reportCode: string): Promise<StreamableFile> {
+    const { buffer, letterNumber } = await this.forward.renderPreviewLetter(reportCode);
+    const safeName = letterNumber.replace(/[^\w.-]+/g, '-');
+
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `inline; filename="pratinjau-${safeName}.pdf"`,
+    });
   }
 
   /**
