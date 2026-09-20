@@ -5,9 +5,20 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import type { ServerSideEncryption } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AppConfig, CONFIG_TOKEN } from '../common/config/configuration';
+
+/**
+ * Nilai `S3_SSE` yang diterima.
+ *
+ * SDK menerima tipe union, bukan string bebas, jadi nilai dari environment
+ * harus dicocokkan lebih dulu. Nilai yang tidak dikenali diabaikan dengan
+ * peringatan — lebih baik unggahan berjalan tanpa enkripsi dan tercatat di log
+ * daripada seluruh unggahan gagal karena satu salah ketik di `.env`.
+ */
+const ALLOWED_SSE: readonly string[] = ['AES256', 'aws:kms', 'aws:kms:dsse'];
 
 export interface StoredObject {
   path: string;
@@ -41,12 +52,22 @@ export class StorageService {
   private readonly signingClient: S3Client;
   private readonly bucket: string;
   private readonly ttlSeconds: number;
-  private readonly serverSideEncryption: string | undefined;
+  private readonly serverSideEncryption: ServerSideEncryption | undefined;
 
   constructor(@Inject(CONFIG_TOKEN) config: AppConfig) {
     this.bucket = config.storage.bucket;
     this.ttlSeconds = config.storage.signedUrlTtlSeconds;
-    this.serverSideEncryption = config.storage.serverSideEncryption;
+    const requestedSse = config.storage.serverSideEncryption;
+    if (requestedSse && !ALLOWED_SSE.includes(requestedSse)) {
+      this.logger.warn(
+        `Nilai S3_SSE "${requestedSse}" tidak dikenali; header enkripsi tidak dikirim. ` +
+          `Nilai yang diterima: ${ALLOWED_SSE.join(', ')}.`,
+      );
+    }
+    this.serverSideEncryption =
+      requestedSse && ALLOWED_SSE.includes(requestedSse)
+        ? (requestedSse as ServerSideEncryption)
+        : undefined;
 
     const common = {
       region: config.storage.region,
