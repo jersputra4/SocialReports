@@ -72,7 +72,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = { Accept: 'application/json' };
 
-  if (method !== 'GET' && method !== 'HEAD') {
+  if (method !== 'GET') {
     const csrf = readCsrfToken();
     if (csrf) headers['X-CSRF-Token'] = csrf;
   }

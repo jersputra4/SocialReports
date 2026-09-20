@@ -18,6 +18,14 @@ import type { ReportStatusValue } from '../reports/state-machine';
 
 // ------------------------------------------------------------- konstanta ---
 
+/**
+ * Nilai `complaint_submissions.channel` untuk penerusan ke Komdigi.
+ *
+ * Indeks unique parsial di migrasi 0008 memakai string ini apa adanya, jadi
+ * mengubahnya di sini saja tidak cukup — migrasi harus ikut diubah.
+ */
+export const KOMDIGI_CHANNEL = 'KOMDIGI_EMAIL';
+
 /** Kode `laws.code` yang dipakai sebagai dasar permintaan pemutusan akses. */
 export const KOMDIGI_LAW_CODE = 'UU_ITE';
 
