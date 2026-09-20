@@ -89,6 +89,14 @@ enum OutboxStatus {
   DEAD
 }
 
+/// Status pengiriman berkas aduan ke kanal resmi (migrasi 0008).
+enum ComplaintDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  DEAD
+}
+
 enum FetchStatus {
   OK
   PARTIAL
@@ -621,18 +629,33 @@ model ReviewDecision {
 model ComplaintSubmission {
   id                String   @id @default(dbgenerated("uuid_generate_v7()")) @map("submission_id") @db.Uuid
   reportId          String   @map("report_id") @db.Uuid
-  /// IN_APP_FORM | EMAIL | WEB_FORM | LAW_ENFORCEMENT_PORTAL
+  /// IN_APP_FORM | EMAIL | WEB_FORM | LAW_ENFORCEMENT_PORTAL | KOMDIGI_EMAIL
   channel           String   @db.VarChar(64)
   submittedBy       String   @map("submitted_by") @db.Uuid
   submittedAt       DateTime @map("submitted_at") @db.Timestamptz(6)
+  /// Nomor tiket yang diberikan instansi tujuan.
   externalReference String?  @map("external_reference") @db.VarChar(256)
   notes             String?  @db.Text
+
+  // ---- pelacakan pengiriman otomatis (migrasi 0008)
+  deliveryStatus ComplaintDeliveryStatus @default(PENDING) @map("delivery_status")
+  /// Message-ID SMTP surat yang dikirim sistem.
+  messageId      String?                 @map("message_id") @db.VarChar(512)
+  /// SHA-256 berkas surat, untuk menautkan baris ini ke dokumen yang dikirim.
+  payloadHash    String?                 @map("payload_hash") @db.VarChar(64)
+  attemptCount   Int                     @default(0) @map("attempt_count")
+  lastAttemptAt  DateTime?               @map("last_attempt_at") @db.Timestamptz(6)
+  lastError      String?                 @map("last_error") @db.VarChar(512)
+
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [submittedBy], references: [id])
 
   @@index([reportId])
+  @@index([deliveryStatus, lastAttemptAt])
+  // Indeks unique parsial penjaga kiriman ganda ke Komdigi hanya ada di
+  // migrasi 0008; Prisma belum mendukung predikat WHERE pada indeks.
   @@map("complaint_submissions")
 }
 
