@@ -30,6 +30,9 @@ export class CreateReportDto {
 
   @IsOptional()
   @IsString()
+  @MinLength(50, {
+    message: 'Kronologi kejadian minimal 50 karakter.',
+  })
   @MaxLength(2000)
   description?: string;
 }
@@ -42,6 +45,9 @@ export class UpdateReportDto {
 
   @IsOptional()
   @IsString()
+  @MinLength(50, {
+    message: 'Kronologi kejadian minimal 50 karakter.',
+  })
   @MaxLength(2000)
   description?: string;
 
