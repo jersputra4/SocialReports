@@ -41,10 +41,12 @@ export class StorageService {
   private readonly signingClient: S3Client;
   private readonly bucket: string;
   private readonly ttlSeconds: number;
+  private readonly serverSideEncryption: string | undefined;
 
   constructor(@Inject(CONFIG_TOKEN) config: AppConfig) {
     this.bucket = config.storage.bucket;
     this.ttlSeconds = config.storage.signedUrlTtlSeconds;
+    this.serverSideEncryption = config.storage.serverSideEncryption;
 
     const common = {
       region: config.storage.region,
@@ -69,8 +71,10 @@ export class StorageService {
         Key: path,
         Body: body,
         ContentType: contentType,
-        // Enkripsi sisi server. MinIO dan S3 sama-sama menerima header ini.
-        ServerSideEncryption: 'AES256',
+        // Header enkripsi hanya dikirim bila dikonfigurasi. MinIO menolaknya
+        // dengan `NotImplemented` selama KMS belum aktif, dan penolakan itu
+        // menggagalkan seluruh unggahan. Lihat catatan pada `S3_SSE`.
+        ServerSideEncryption: this.serverSideEncryption,
         // Mencegah peramban menebak-nebak jenis berkas.
         ContentDisposition: 'attachment',
       }),
