@@ -76,6 +76,8 @@ export interface AppConfig {
     endpoint: string;
     /** Alamat yang dipakai untuk menandatangani URL unduh (dibuka peramban). */
     publicEndpoint: string;
+    /** Algoritma enkripsi sisi server; kosong berarti header tidak dikirim. */
+    serverSideEncryption: string | undefined;
     region: string;
     bucket: string;
     accessKey: string;
@@ -195,6 +197,18 @@ export function loadConfiguration(): AppConfig {
       // Docker. Tanda tangan SigV4 mencakup host, jadi URL harus ditandatangani
       // memakai alamat yang benar-benar dibuka peramban.
       publicEndpoint: str('S3_PUBLIC_ENDPOINT', str('S3_ENDPOINT', 'http://localhost:9000')),
+      // Kosong secara bawaan, dan itu disengaja.
+      //
+      // MinIO menolak header enkripsi sisi server dengan galat `NotImplemented`
+      // selama KMS belum dikonfigurasi. Sebelumnya header ini dikirim tanpa
+      // syarat, sehingga pemasangan baru yang belum menyiapkan KMS mendapati
+      // SELURUH unggahan bukti gagal tanpa petunjuk yang jelas.
+      //
+      // Setel `S3_SSE=AES256` setelah KMS aktif (MinIO: `MINIO_KMS_SECRET_KEY`)
+      // atau saat memakai Amazon S3, yang menerimanya tanpa konfigurasi
+      // tambahan. Untuk data bukti pelanggaran, menyalakannya sangat
+      // dianjurkan.
+      serverSideEncryption: process.env.S3_SSE || undefined,
       region: str('S3_REGION', 'us-east-1'),
       bucket: str('S3_BUCKET', 'social-report'),
       accessKey: str('S3_ACCESS_KEY'),
