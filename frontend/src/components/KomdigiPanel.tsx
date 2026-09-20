@@ -82,14 +82,29 @@ export function KomdigiPanel({
       title="Penerusan ke Komdigi"
       description="Mengirim surat aduan resmi beserta berkas bukti ke kanal pengaduan konten."
       actions={
-        <Button
-          variant="primary"
-          loading={pending}
-          disabled={!eligible || preview.loading || pending}
-          onClick={() => setConfirmOpen(true)}
-        >
-          Teruskan ke Komdigi
-        </Button>
+        <>
+          {/*
+            Pratinjau dibuka sebagai tautan biasa, bukan lewat klien API.
+            Peramban yang merender PDF-nya, dan cookie sesi ikut terkirim
+            karena endpoint-nya satu origin dengan halaman ini.
+          */}
+          <a
+            className="btn-secondary"
+            href={`/api/v1/admin/reports/${reportCode}/forward/komdigi/letter`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Lihat surat
+          </a>
+          <Button
+            variant="primary"
+            loading={pending}
+            disabled={!eligible || preview.loading || pending}
+            onClick={() => setConfirmOpen(true)}
+          >
+            Teruskan ke Komdigi
+          </Button>
+        </>
       }
     >
       {preview.loading && <LoadingBlock label="Memeriksa kelayakan…" />}
