@@ -1,4 +1,5 @@
 import { escapeHtml } from '../common/utils/sanitize.util';
+import type { MailAttachment } from './mail-attachments';
 
 export interface MailContent {
   subject: string;
@@ -6,6 +7,12 @@ export interface MailContent {
   html: string;
   /** Nilai yang disorot pada kotak masuk pengembangan (OTP/token). */
   highlight?: string;
+  /**
+   * Lampiran opsional. Email notifikasi pengguna tidak pernah memakai ini;
+   * yang memakainya adalah surat resmi ke instansi, yang memang harus
+   * membawa berkas bukti.
+   */
+  attachments?: MailAttachment[];
 }
 
 function layout(title: string, bodyHtml: string, appName: string): string {

@@ -3,7 +3,14 @@ import { createTransport, Transporter } from 'nodemailer';
 import { AppConfig, CONFIG_TOKEN } from '../common/config/configuration';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { maskEmail } from '../common/utils/sanitize.util';
+import { describeAttachments, prepareAttachments } from './mail-attachments';
 import { MailContent } from './mail-templates';
+
+/** Hasil pengiriman; `messageId` dipakai sebagai acuan kiriman resmi. */
+export interface MailSendResult {
+  messageId: string | null;
+  attachmentCount: number;
+}
 
 /**
  * Pengiriman email.
@@ -40,29 +47,57 @@ export class MailerService {
     }
   }
 
-  async send(to: string, content: MailContent): Promise<void> {
+  /**
+   * Mengirim satu email.
+   *
+   * Lampiran dibersihkan lebih dulu oleh `prepareAttachments`: nama dirapikan,
+   * nama ganda dibedakan, dan ukuran total diperiksa. Bila melewati batas,
+   * fungsi ini melempar `AttachmentTooLargeError` sebelum menyentuh jaringan,
+   * sehingga pemanggil dapat mencatat kegagalan yang jelas alih-alih menunggu
+   * penolakan dari server tujuan.
+   */
+  async send(to: string, content: MailContent): Promise<MailSendResult> {
+    const attachments =
+      content.attachments && content.attachments.length > 0
+        ? prepareAttachments(content.attachments)
+        : [];
+
+    const jumlah = attachments.length > 0 ? ` (${attachments.length} lampiran)` : '';
+
     if (this.config.mail.driver === 'smtp' && this.transporter) {
-      await this.transporter.sendMail({
+      const info = await this.transporter.sendMail({
         from: this.config.mail.from,
         to,
         subject: content.subject,
         text: content.text,
         html: content.html,
+        attachments: attachments.length > 0 ? attachments : undefined,
       });
-      this.logger.log(`Email "${content.subject}" terkirim ke ${maskEmail(to)}`);
-      return;
+
+      this.logger.log(`Email "${content.subject}" terkirim ke ${maskEmail(to)}${jumlah}`);
+      return {
+        messageId: typeof info?.messageId === 'string' ? info.messageId : null,
+        attachmentCount: attachments.length,
+      };
     }
 
-    await this.prisma.devMailbox.create({
+    // Driver mailbox tidak mengirim apa pun dan tidak menyimpan isi lampiran.
+    // Daftar nama dan ukurannya tetap dicatat agar alur dapat diperiksa.
+    const mail = await this.prisma.devMailbox.create({
       data: {
         toAddress: to,
         subject: content.subject,
-        bodyText: content.text,
+        bodyText: `${content.text}${describeAttachments(attachments)}`,
         bodyHtml: content.html,
         highlight: content.highlight?.slice(0, 128),
       },
+      select: { id: true },
     });
-    this.logger.log(`Email "${content.subject}" masuk kotak lokal untuk ${maskEmail(to)}`);
+
+    this.logger.log(
+      `Email "${content.subject}" masuk kotak lokal untuk ${maskEmail(to)}${jumlah}`,
+    );
+    return { messageId: `mailbox:${mail.id}`, attachmentCount: attachments.length };
   }
 
   /**
