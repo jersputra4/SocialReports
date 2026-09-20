@@ -6,7 +6,9 @@ import { OutboxEventType, OutboxService } from '../notifications/outbox.service'
 import { StorageService } from '../storage/storage.service';
 import { sha256Hex } from '../common/utils/crypto.util';
 import { uuidv7 } from '../common/utils/uuid-v7';
+import type { TDocumentDefinitions } from 'pdfmake/interfaces';
 import { buildReportPdf, ReportPdfData } from './report-pdf.builder';
+import { buildKomdigiLetter, KomdigiLetterData } from './komdigi-letter.builder';
 
 /**
  * pdfmake adalah paket CommonJS tanpa ekspor default bertipe untuk sisi Node,
@@ -129,7 +131,20 @@ export class DocumentsService {
     return { documentId: document.id, version: document.version, fileHash };
   }
 
-  private render(definition: ReturnType<typeof buildReportPdf>): Promise<Buffer> {
+  /**
+   * Merender surat aduan Komdigi menjadi PDF.
+   *
+   * Surat ini TIDAK disimpan sebagai `report_documents`. Ia bukan dokumen
+   * milik pelanggan melainkan lampiran satu kali pengiriman, dan jejaknya
+   * dicatat lewat `complaint_submissions.payload_hash`. Merender di sini
+   * membuat seluruh pemakaian pdfmake tetap berada di satu kelas, lengkap
+   * dengan konfigurasi font yang tidak menyentuh jaringan.
+   */
+  async renderKomdigiLetter(data: KomdigiLetterData): Promise<Buffer> {
+    return this.render(buildKomdigiLetter(data));
+  }
+
+  private render(definition: TDocumentDefinitions): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const stream = this.printer.createPdfKitDocument(definition);
