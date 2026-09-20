@@ -1,5 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { KomdigiPanel } from '../../components/KomdigiPanel';
 import { PageHeader } from '../../components/Layout';
 import { ProgressMeter } from '../../components/Stats';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -22,7 +23,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAction, useApiQuery } from '../../hooks/useApi';
 import { api } from '../../lib/api';
 import { formatBytes, formatDateTime, formatNumber, formatRupiah, formatTaxRate } from '../../lib/format';
-import { CHANNEL_LABEL, PROOF_TYPE_LABEL, presentStatus } from '../../lib/status';
+import { CHANNEL_LABEL, MANUAL_CHANNELS, PROOF_TYPE_LABEL, presentStatus } from '../../lib/status';
 
 interface AdminReportDetail {
   reportCode: string;
@@ -505,6 +506,10 @@ export default function AdminReportDetailPage() {
             )}
           </Card>
 
+          {can('report.fulfill') && data.status === 'APPROVED' && (
+            <KomdigiPanel reportCode={reportCode} onForwarded={reloadAll} />
+          )}
+
           <Card title="Riwayat status">
             <ol className="space-y-3 text-sm">
               {data.statusHistory
@@ -599,9 +604,9 @@ export default function AdminReportDetailPage() {
         <div className="space-y-4">
           <Field label="Kanal pelaporan" required>
             <Select value={channel} onChange={(event) => setChannel(event.target.value)}>
-              {Object.entries(CHANNEL_LABEL).map(([code, label]) => (
+              {MANUAL_CHANNELS.map((code) => (
                 <option key={code} value={code}>
-                  {label}
+                  {CHANNEL_LABEL[code]}
                 </option>
               ))}
             </Select>
