@@ -74,6 +74,8 @@ export interface AppConfig {
 
   storage: {
     endpoint: string;
+    /** Alamat yang dipakai untuk menandatangani URL unduh (dibuka peramban). */
+    publicEndpoint: string;
     region: string;
     bucket: string;
     accessKey: string;
@@ -188,6 +190,11 @@ export function loadConfiguration(): AppConfig {
 
     storage: {
       endpoint: str('S3_ENDPOINT', 'http://localhost:9000'),
+      // Alamat yang dipakai untuk MENANDATANGANI URL unduh. Berbeda dari
+      // `endpoint` karena peramban tidak dapat meresolusi nama kontainer
+      // Docker. Tanda tangan SigV4 mencakup host, jadi URL harus ditandatangani
+      // memakai alamat yang benar-benar dibuka peramban.
+      publicEndpoint: str('S3_PUBLIC_ENDPOINT', str('S3_ENDPOINT', 'http://localhost:9000')),
       region: str('S3_REGION', 'us-east-1'),
       bucket: str('S3_BUCKET', 'social-report'),
       accessKey: str('S3_ACCESS_KEY'),
