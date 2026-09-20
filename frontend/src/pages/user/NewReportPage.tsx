@@ -19,6 +19,17 @@ import { formatBytes, formatRupiah, formatTaxRate } from '../../lib/format';
 const NO_REFUND_VERSION = '1.1';
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
+/**
+ * Panjang minimum kronologi.
+ *
+ * Angkanya sama dengan `MIN_DESCRIPTION_LENGTH` pada gate kelayakan Komdigi di
+ * backend. Disamakan supaya pelapor tidak menyelesaikan report yang kelak
+ * tertahan di meja admin hanya karena uraiannya terlalu pendek. Backend tetap
+ * pemegang keputusan; batas di sini hanya memindahkan penolakannya ke depan,
+ * saat pelapor masih menulis.
+ */
+const MIN_DESCRIPTION = 50;
+
 interface ActionType { id: string; code: string; name: string }
 interface PackageOption {
   packageId: string;
@@ -69,6 +80,7 @@ export default function NewReportPage() {
   const [actionTypeId, setActionTypeId] = useState('');
   const [packageId, setPackageId] = useState('');
   const [description, setDescription] = useState('');
+  const descriptionTooShort = description.trim().length < MIN_DESCRIPTION;
 
   // langkah 2
   const [policyVersionIds, setPolicyVersionIds] = useState<string[]>([]);
@@ -166,7 +178,13 @@ export default function NewReportPage() {
 
   /* ------------------------------------------------------------- langkah 4 */
 
-  const uploadFiles = async () => {
+  /**
+   * Mengunggah berkas terpilih, lalu — bila diminta — lanjut ke langkah
+   * berikutnya. Kelanjutan hanya terjadi setelah SELURUH berkas terunggah,
+   * sehingga pelapor tidak pernah berpindah halaman sambil mengira buktinya
+   * sudah masuk padahal satu unggahan gagal di tengah jalan.
+   */
+  const uploadFiles = async (thenContinue = false) => {
     clearError();
     for (const file of files) {
       const formData = new FormData();
@@ -181,6 +199,7 @@ export default function NewReportPage() {
       setUploaded((current) => [...current, result]);
     }
     setFiles([]);
+    if (thenContinue) setStep(4);
   };
 
   /* ------------------------------------------------------------- langkah 5 */
@@ -316,20 +335,41 @@ export default function NewReportPage() {
               </div>
             </fieldset>
 
-            <Field label="Keterangan tambahan" hint="Opsional, maksimal 2000 karakter.">
+            <Field
+              label="Kronologi kejadian"
+              required
+              hint={
+                descriptionTooShort
+                  ? `Minimal ${MIN_DESCRIPTION} karakter, saat ini ${description.trim().length}.`
+                  : `${description.trim().length} dari maksimal 2000 karakter.`
+              }
+              error={
+                description.length > 0 && descriptionTooShort
+                  ? `Kurang ${MIN_DESCRIPTION - description.trim().length} karakter lagi.`
+                  : undefined
+              }
+            >
               <Textarea
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 maxLength={2000}
-                placeholder="Jelaskan singkat apa yang terjadi dan mengapa konten ini dilaporkan."
+                invalid={description.length > 0 && descriptionTooShort}
+                placeholder="Jelaskan apa yang terjadi, sejak kapan, dan mengapa konten ini dilaporkan."
               />
             </Field>
+
+            <Alert tone="info" title="Kenapa kronologi wajib">
+              <p>
+                Uraian ini disalin apa adanya ke berkas aduan resmi. Aduan tanpa uraian
+                kejadian tidak dapat diteruskan ke Komdigi.
+              </p>
+            </Alert>
 
             <div className="flex justify-end">
               <Button
                 variant="primary"
                 loading={pending}
-                disabled={!targetUrl.trim() || !actionTypeId || !packageId}
+                disabled={!targetUrl.trim() || !actionTypeId || !packageId || descriptionTooShort}
                 onClick={createDraft}
               >
                 Simpan dan lanjut
@@ -543,14 +583,6 @@ export default function NewReportPage() {
             </ul>
           )}
 
-          {files.length > 0 && (
-            <div className="mt-3">
-              <Button variant="primary" loading={pending} onClick={uploadFiles}>
-                Unggah {files.length} berkas
-              </Button>
-            </div>
-          )}
-
           {uploaded.length > 0 && (
             <div className="mt-5">
               <p className="text-sm font-medium">Sudah terunggah</p>
@@ -565,11 +597,27 @@ export default function NewReportPage() {
             </div>
           )}
 
-          <div className="mt-5 flex justify-between">
+          {/*
+            Satu tombol lanjut, isinya menyesuaikan keadaan.
+
+            Selama masih ada berkas terpilih yang belum terunggah, tombolnya
+            mengunggah lalu melanjutkan — supaya pelapor tidak bisa berpindah
+            halaman sambil meninggalkan berkas yang sudah ia pilih. Pilihan
+            "lanjut tanpa evidence" hanya muncul ketika memang belum ada berkas
+            sama sekali.
+          */}
+          <div className="mt-5 flex flex-wrap justify-between gap-3">
             <Button onClick={() => setStep(2)}>Kembali</Button>
-            <Button variant="primary" onClick={() => setStep(4)}>
-              {uploaded.length === 0 ? 'Lanjut tanpa evidence' : 'Lanjut ke pembayaran'}
-            </Button>
+
+            {files.length > 0 ? (
+              <Button variant="primary" loading={pending} onClick={() => uploadFiles(true)}>
+                Unggah {files.length} berkas dan lanjut
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={() => setStep(4)}>
+                {uploaded.length === 0 ? 'Lanjut tanpa evidence' : 'Lanjut ke pembayaran'}
+              </Button>
+            )}
           </div>
         </Card>
       )}
