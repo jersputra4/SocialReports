@@ -44,6 +44,12 @@ export class ComplaintsService {
           submittedAt: new Date(),
           externalReference: input.externalReference?.slice(0, 256),
           notes: input.notes,
+          // Admin mencatat pelaporan yang sudah ia lakukan sendiri, jadi
+          // pengirimannya selesai saat baris ini dibuat. Default kolom
+          // (PENDING) berlaku untuk kiriman otomatis yang belum dikerjakan job.
+          deliveryStatus: 'SENT',
+          attemptCount: 1,
+          lastAttemptAt: new Date(),
         },
       });
 
