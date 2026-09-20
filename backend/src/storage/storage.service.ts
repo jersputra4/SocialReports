@@ -26,21 +26,40 @@ export interface StoredObject {
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
   private readonly client: S3Client;
+  /**
+   * Klien kedua, dipakai HANYA untuk menandatangani URL unduh.
+   *
+   * Klien utama menunjuk alamat internal (`http://minio:9000`) karena itu yang
+   * dapat dijangkau dari dalam jaringan Docker. Peramban tidak dapat
+   * meresolusi nama itu. Tanda tangan SigV4 mencakup host, jadi URL tidak bisa
+   * sekadar ditulis ulang setelah dibuat — ia harus ditandatangani sejak awal
+   * memakai alamat publik.
+   *
+   * Bila `S3_PUBLIC_ENDPOINT` tidak diisi, nilainya sama dengan `S3_ENDPOINT`
+   * dan klien ini berperilaku persis seperti klien utama.
+   */
+  private readonly signingClient: S3Client;
   private readonly bucket: string;
   private readonly ttlSeconds: number;
 
   constructor(@Inject(CONFIG_TOKEN) config: AppConfig) {
     this.bucket = config.storage.bucket;
     this.ttlSeconds = config.storage.signedUrlTtlSeconds;
-    this.client = new S3Client({
-      endpoint: config.storage.endpoint,
+
+    const common = {
       region: config.storage.region,
       forcePathStyle: config.storage.forcePathStyle,
       credentials: {
         accessKeyId: config.storage.accessKey,
         secretAccessKey: config.storage.secretKey,
       },
-    });
+    };
+
+    this.client = new S3Client({ ...common, endpoint: config.storage.endpoint });
+    this.signingClient =
+      config.storage.publicEndpoint === config.storage.endpoint
+        ? this.client
+        : new S3Client({ ...common, endpoint: config.storage.publicEndpoint });
   }
 
   async put(path: string, body: Buffer, contentType: string): Promise<StoredObject> {
@@ -73,7 +92,9 @@ export class StorageService {
         : undefined,
     });
 
-    const url = await getSignedUrl(this.client, command, { expiresIn: this.ttlSeconds });
+    const url = await getSignedUrl(this.signingClient, command, {
+      expiresIn: this.ttlSeconds,
+    });
     return { url, expiresInSeconds: this.ttlSeconds };
   }
 
