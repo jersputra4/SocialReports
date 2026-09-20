@@ -156,4 +156,20 @@ export const CHANNEL_LABEL: Record<string, string> = {
   EMAIL: 'Email resmi platform',
   WEB_FORM: 'Formulir web platform',
   LAW_ENFORCEMENT_PORTAL: 'Portal penegak hukum',
+  KOMDIGI_EMAIL: 'Email aduan Komdigi',
 };
+
+/**
+ * Kanal yang boleh dicatat manual oleh admin.
+ *
+ * `KOMDIGI_EMAIL` sengaja tidak ada di sini: baris kanal itu dibuat oleh alur
+ * penerusan otomatis, lengkap dengan nomor surat dan hash berkas. Membiarkan
+ * admin mencatatnya manual akan menghasilkan baris yang mengaku terkirim
+ * tanpa surat yang benar-benar dikirim.
+ */
+export const MANUAL_CHANNELS = [
+  'IN_APP_FORM',
+  'EMAIL',
+  'WEB_FORM',
+  'LAW_ENFORCEMENT_PORTAL',
+] as const;
