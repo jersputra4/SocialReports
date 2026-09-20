@@ -116,6 +116,26 @@ export interface AppConfig {
     serviceToken: string;
   };
 
+  /**
+   * Penerusan aduan ke Komdigi.
+   *
+   * Seluruhnya punya nilai bawaan yang aman: `enabled` mati, sehingga
+   * pemasangan lama tetap jalan tanpa menambah satu pun variabel environment.
+   */
+  komdigi: {
+    enabled: boolean;
+    /** Alamat tujuan aduan. Wajib diisi bila `enabled` benar. */
+    emailTo: string;
+    senderName: string;
+    senderAddress: string | null;
+    senderEmail: string;
+    senderPhone: string | null;
+    /** Batas total lampiran per surat. Lebih ketat dari batas keras mailer. */
+    maxAttachmentBytes: number;
+    /** Pagar kecepatan: kiriman maksimum per 24 jam. */
+    dailyLimit: number;
+  };
+
   redisUrl: string;
   databaseUrl: string;
 }
@@ -208,6 +228,17 @@ export function loadConfiguration(): AppConfig {
     fetcher: {
       url: str('FETCHER_URL', 'http://localhost:4001'),
       serviceToken: str('FETCHER_SERVICE_TOKEN'),
+    },
+
+    komdigi: {
+      enabled: bool('KOMDIGI_ENABLED', false),
+      emailTo: str('KOMDIGI_EMAIL_TO', ''),
+      senderName: str('KOMDIGI_SENDER_NAME', str('APP_NAME', 'Sistem Pelaporan Konten')),
+      senderAddress: process.env.KOMDIGI_SENDER_ADDRESS || null,
+      senderEmail: str('KOMDIGI_SENDER_EMAIL', str('MAIL_FROM', 'no-reply@localhost')),
+      senderPhone: process.env.KOMDIGI_SENDER_PHONE || null,
+      maxAttachmentBytes: int('KOMDIGI_MAX_ATTACHMENT_MB', 8) * 1024 * 1024,
+      dailyLimit: int('KOMDIGI_DAILY_LIMIT', 20),
     },
 
     redisUrl: str('REDIS_URL', 'redis://localhost:6379'),
