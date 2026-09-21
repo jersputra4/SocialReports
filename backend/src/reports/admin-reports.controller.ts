@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { AuthenticatedUser } from '../common/security/auth.types';
 import { CurrentUser, RequirePermissions } from '../common/security/decorators';
 import { FailReportDto, ListReportsQueryDto, ReviewDecisionDto } from './dto/report.dto';
+import { ReportStatsService } from './report-stats.service';
 import { ReportsService } from './reports.service';
 import { ReportTransitionService } from './report-transition.service';
 import { ReviewService } from './review.service';
@@ -20,7 +21,21 @@ export class AdminReportsController {
     private readonly reports: ReportsService,
     private readonly review: ReviewService,
     private readonly transitions: ReportTransitionService,
+    private readonly stats: ReportStatsService,
   ) {}
+
+  /**
+   * Angka ringkas dasbor.
+   *
+   * Diletakkan sebelum rute `:reportCode` dengan sengaja. Nest mencocokkan
+   * rute berurutan, jadi `:reportCode` yang ditaruh lebih dulu akan menelan
+   * `/stats` dan menganggapnya kode report.
+   */
+  @Get('stats')
+  @RequirePermissions('report.review')
+  summary() {
+    return this.stats.summary();
+  }
 
   @Get()
   @RequirePermissions('report.review')

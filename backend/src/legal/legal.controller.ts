@@ -10,7 +10,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { RequirePermissions, RequireStepUpMfa } from '../common/security/decorators';
+import { Public, RequirePermissions, RequireStepUpMfa } from '../common/security/decorators';
 import { LegalService } from './legal.service';
 
 class ParagraphDto {
@@ -38,16 +38,29 @@ class AddArticleDto {
   paragraphs!: ParagraphDto[];
 }
 
+/**
+ * Katalog dasar hukum.
+ *
+ * Kedua endpoint bersifat publik karena isinya teks undang-undang — dokumen
+ * yang memang terbuka untuk umum, tanpa satu pun data pribadi. Halaman
+ * panduan pelapor membacanya sebelum orang mendaftar, dan panduan paling
+ * berguna justru pada saat itu: ketika seseorang masih menimbang apakah
+ * kasusnya punya dasar hukum sama sekali.
+ *
+ * Keduanya hanya membaca, dan tetap dibatasi laju oleh reverse proxy.
+ */
 @Controller('legal')
 export class LegalController {
   constructor(private readonly legal: LegalService) {}
 
   @Get('laws')
+  @Public()
   listLaws() {
     return this.legal.listLaws();
   }
 
   @Get('versions/:versionId/articles')
+  @Public()
   listArticles(@Param('versionId') versionId: string) {
     return this.legal.listArticles(versionId);
   }

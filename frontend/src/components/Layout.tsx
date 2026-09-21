@@ -15,6 +15,7 @@ const USER_NAV: NavItem[] = [
   { to: '/', label: 'Ringkasan', glyph: '◈' },
   { to: '/report', label: 'Report saya', glyph: '▤' },
   { to: '/report/baru', label: 'Buat report', glyph: '＋' },
+  { to: '/panduan', label: 'Panduan', glyph: '?' },
   { to: '/pengaturan', label: 'Pengaturan', glyph: '⚙' },
 ];
 

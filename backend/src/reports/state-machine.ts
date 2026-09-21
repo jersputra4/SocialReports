@@ -25,6 +25,32 @@ export type ReportStatusValue =
   | 'CANCELLED'
   | 'ARCHIVED';
 
+/**
+ * Seluruh status, berurutan sesuai perjalanan laporan.
+ *
+ * Daftar ini berpasangan dengan `ReportStatusValue` di atas: menambah satu
+ * status tanpa menambahkannya di sini akan membuat TypeScript menolak
+ * berkas ini, sehingga keduanya tidak mungkin bergeser diam-diam.
+ */
+export const ALL_STATUSES: readonly ReportStatusValue[] = [
+  'DRAFT',
+  'WAITING_PAYMENT',
+  'PAYMENT_REVIEW',
+  'PAYMENT_REJECTED',
+  'EXPIRED',
+  'PAID',
+  'WAITING_REVIEW',
+  'APPROVED',
+  'REJECTED',
+  'NEEDS_REVISION',
+  'SUBMITTED',
+  'PARTIALLY_COMPLETED',
+  'COMPLETED',
+  'FAILED',
+  'CANCELLED',
+  'ARCHIVED',
+];
+
 export type TransitionActor = 'USER' | 'REVIEWER' | 'ADMIN' | 'FINANCE' | 'SYSTEM';
 
 /** Prasyarat yang harus dipenuhi sebelum transisi dijalankan. */

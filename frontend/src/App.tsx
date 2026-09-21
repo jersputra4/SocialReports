@@ -11,6 +11,8 @@ import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 
+import GuidePage from './pages/GuidePage';
+
 import DashboardPage from './pages/user/DashboardPage';
 import ReportsPage from './pages/user/ReportsPage';
 import NewReportPage from './pages/user/NewReportPage';
@@ -83,6 +85,7 @@ export default function App() {
           </RedirectIfAuthenticated>
         }
       />
+        <Route path="/panduan" element={<GuidePage />} />
       <Route path="/verifikasi-email" element={<VerifyEmailPage />} />
       <Route path="/lupa-kata-sandi" element={<ForgotPasswordPage />} />
       <Route path="/atur-ulang-kata-sandi" element={<ResetPasswordPage />} />

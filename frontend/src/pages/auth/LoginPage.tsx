@@ -102,6 +102,11 @@ export default function LoginPage() {
                 Lupa kata sandi?
               </Link>
             </p>
+            <p className="mt-2">
+              <Link to="/panduan" className="font-medium text-accent-700 underline">
+                Baca panduan pelapor
+              </Link>
+            </p>
           </>
         ) : null
       }
