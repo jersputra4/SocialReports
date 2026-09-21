@@ -57,6 +57,14 @@ export interface AdminNotificationInput {
   articleLabels: readonly string[];
   /** Kronologi mentah dari pelapor. */
   description: string | null;
+  /**
+   * Jumlah unit pada paket yang dibeli, mis. 300, 500, 1000.
+   *
+   * Diambil dari snapshot di baris report, bukan dari tabel paket. Paket dapat
+   * diubah admin kapan saja; yang berlaku bagi satu report adalah angka yang
+   * dibekukan saat pembayaran dimulai.
+   */
+  packageQuantity: number | null;
   evidenceCount: number;
   /** Tautan ke panel admin; selalu menuntut login. */
   adminLink: string;
@@ -72,7 +80,12 @@ export interface AdminNotification {
    *
    * Urutannya tetap dan menjadi kontrak dengan template yang didaftarkan di
    * Meta: {{1}} kode report, {{2}} ringkasan pelanggaran, {{3}} URL target,
-   * {{4}} kutipan kronologi, {{5}} tautan panel admin.
+   * {{4}} kutipan kronologi, {{5}} tautan panel admin, {{6}} paket.
+   *
+   * Menambah parameter di TENGAH urutan akan menggeser arti parameter
+   * sesudahnya pada template yang sudah disetujui Meta, dan pesan akan
+   * terkirim dengan isi yang tertukar tanpa satu pun galat. Parameter baru
+   * selalu ditambahkan di akhir, kecuali templatenya memang didaftarkan ulang.
    */
   parameters: string[];
 }
@@ -167,6 +180,19 @@ export function summarizeGrounds(
   return parts.length > 0 ? parts.join('; ') : 'Tidak dirinci';
 }
 
+/**
+ * Ukuran paket yang dibeli pelapor.
+ *
+ * Angkanya diberi pemisah ribuan karena inilah satu-satunya bilangan besar di
+ * dalam pesan: "1.000 laporan" terbaca sekali lihat, "1000 laporan" menuntut
+ * admin menghitung digit. Nilai kosong ditandai dengan jelas alih-alih
+ * ditampilkan sebagai nol, yang akan terbaca seolah paketnya memang nol unit.
+ */
+export function formatPackage(quantity: number | null): string {
+  if (quantity === null || !Number.isFinite(quantity)) return 'tidak tercatat';
+  return `${new Intl.NumberFormat('id-ID').format(quantity)} laporan`;
+}
+
 /** Waktu setempat, karena admin yang membacanya berada di Indonesia. */
 export function formatJakartaTime(value: Date): string {
   return new Intl.DateTimeFormat('id-ID', {
@@ -203,10 +229,13 @@ export function buildAdminNotification(input: AdminNotificationInput): AdminNoti
     .filter((value): value is string => Boolean(value))
     .join(' · ');
 
+  const paket = formatPackage(input.packageQuantity);
+
   const lines = [
     `Report baru: ${input.reportCode}`,
     `Status: ${input.status}`,
     jenis ? `Jenis: ${jenis}` : null,
+    `Paket: ${paket}`,
     `Dasar: ${grounds}`,
     `Target: ${target}`,
     excerpt ? `Kronologi: ${excerpt}` : 'Kronologi: tidak diisi',
@@ -223,6 +252,7 @@ export function buildAdminNotification(input: AdminNotificationInput): AdminNoti
       clampParameter(target),
       clampParameter(excerpt || 'tidak diisi'),
       clampParameter(input.adminLink),
+      clampParameter(paket),
     ],
   };
 }

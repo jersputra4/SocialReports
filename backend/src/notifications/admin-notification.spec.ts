@@ -6,6 +6,7 @@ import {
   buildExcerpt,
   flattenWhitespace,
   formatJakartaTime,
+  formatPackage,
   maskDestination,
   summarizeGrounds,
   truncateAtWord,
@@ -24,6 +25,7 @@ function input(overrides: Partial<AdminNotificationInput> = {}): AdminNotificati
     policyLabels: ['Ujaran kebencian'],
     articleLabels: ['UU ITE Pasal 28 ayat (2)'],
     description: 'Akun tersebut mengunggah konten yang menyerang kelompok tertentu.',
+    packageQuantity: 500,
     evidenceCount: 2,
     adminLink: 'http://145.79.8.242:8080/admin/report/RPT-R2QGGWHNM7',
     occurredAt: OCCURRED_AT,
@@ -146,6 +148,20 @@ describe('summarizeGrounds', () => {
   });
 });
 
+describe('formatPackage', () => {
+  it('memberi pemisah ribuan pada angka besar', () => {
+    expect(formatPackage(1000)).toBe('1.000 laporan');
+  });
+
+  it('menampilkan angka kecil apa adanya', () => {
+    expect(formatPackage(300)).toBe('300 laporan');
+  });
+
+  it('menandai ketiadaan data, bukan menampilkannya sebagai nol', () => {
+    expect(formatPackage(null)).toBe('tidak tercatat');
+  });
+});
+
 describe('formatJakartaTime', () => {
   it('memakai zona Asia/Jakarta, bukan UTC', () => {
     // 07:31 UTC adalah 14:31 WIB.
@@ -191,12 +207,23 @@ describe('buildAdminNotification', () => {
     expect(hasil.text).not.toContain('Jenis:');
   });
 
-  it('menghasilkan lima parameter dengan urutan tetap', () => {
+  it('menghasilkan enam parameter dengan urutan tetap', () => {
     const hasil = buildAdminNotification(input());
-    expect(hasil.parameters).toHaveLength(5);
+    expect(hasil.parameters).toHaveLength(6);
     expect(hasil.parameters[0]).toBe('RPT-R2QGGWHNM7');
     expect(hasil.parameters[2]).toBe('https://example.com/p/abc123');
     expect(hasil.parameters[4]).toContain('/admin/report/');
+    expect(hasil.parameters[5]).toBe('500 laporan');
+  });
+
+  it('mencantumkan paket yang dibeli pelapor', () => {
+    const hasil = buildAdminNotification(input({ packageQuantity: 1000 }));
+    expect(hasil.text).toContain('Paket: 1.000 laporan');
+  });
+
+  it('tetap menyusun pesan ketika paket tidak tercatat', () => {
+    const hasil = buildAdminNotification(input({ packageQuantity: null }));
+    expect(hasil.text).toContain('Paket: tidak tercatat');
   });
 
   it('tidak pernah menyisipkan baris baru ke dalam parameter', () => {
