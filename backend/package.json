@@ -13,9 +13,10 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "seed": "ts-node prisma/seed.ts",
     "cli:create-admin": "ts-node cli/create-admin.ts",
+    "cli:seed-uu-ite": "ts-node cli/seed-uu-ite.ts",
     "cli:verify-audit": "ts-node cli/verify-audit-chain.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "jest",
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "test": "prisma generate && jest",
     "lint": "eslint \"{src,cli,prisma}/**/*.ts\""
   },
   "prisma": {
@@ -64,17 +65,7 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "roots": [
-      "<rootDir>/src"
-    ],
+    "roots": ["<rootDir>/src"],
     "testRegex": ".*\\.spec\\.ts$"
-  },
-  "allowScripts": {
-    "@prisma/client@5.20.0": true,
-    "@prisma/engines@5.20.0": true,
-    "prisma@5.20.0": true,
-    "argon2@0.41.1": true,
-    "msgpackr-extract@3.0.4": true,
-    "@nestjs/core@10.4.22": true
   }
 }

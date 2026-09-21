@@ -48,14 +48,59 @@ function Section({
   );
 }
 
+/**
+ * Daftar pasal untuk satu undang-undang.
+ *
+ * Dipisah menjadi komponen sendiri karena setiap undang-undang butuh satu
+ * permintaan HTTP tersendiri, dan React tidak mengizinkan hook dipanggil di
+ * dalam perulangan. Satu komponen per undang-undang menyelesaikannya dengan
+ * rapi, sekaligus membuat tiap daftar memuat secara terpisah — satu
+ * undang-undang yang lambat tidak menahan yang lain.
+ */
+function LawArticles({ law }: { law: LawOption }) {
+  const articles = useApiQuery<ArticleOption[]>(`/legal/versions/${law.versionId}/articles`, [
+    law.versionId,
+  ]);
+
+  return (
+    <div className="mt-5">
+      <h3 className="text-base font-semibold text-ink">
+        {law.shortName ?? law.name}
+        <span className="ml-2 text-xs font-normal text-ink-muted">versi {law.version}</span>
+      </h3>
+      {law.shortName && <p className="text-xs text-ink-muted">{law.name}</p>}
+
+      {articles.loading && <LoadingBlock label="Memuat pasal…" />}
+
+      {articles.data && articles.data.length === 0 && (
+        <p className="mt-2 text-sm text-ink-muted">Belum ada pasal yang dicatat.</p>
+      )}
+
+      {articles.data && articles.data.length > 0 && (
+        <div className="mt-3 space-y-3">
+          {articles.data.map((article) => (
+            <Card key={article.articleId} title={`Pasal ${article.number}`}>
+              {article.title && (
+                <p className="mb-2 text-sm font-medium text-ink">{article.title}</p>
+              )}
+              <ul className="space-y-2">
+                {article.paragraphs.map((paragraph) => (
+                  <li key={paragraph.paragraphId} className="text-sm text-ink-secondary">
+                    <span className="font-medium text-ink">Ayat ({paragraph.number}): </span>
+                    {paragraph.text}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GuidePage() {
   const laws = useApiQuery<LawOption[]>('/legal/laws');
-  const firstLaw = laws.data?.[0] ?? null;
-
-  const articles = useApiQuery<ArticleOption[]>(
-    firstLaw ? `/legal/versions/${firstLaw.versionId}/articles` : null,
-    [firstLaw?.versionId],
-  );
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -133,37 +178,13 @@ export default function GuidePage() {
           sama persis dengan yang akan Anda pilih saat membuat laporan.
         </p>
 
-        {laws.loading && <LoadingBlock label="Memuat daftar pasal…" />}
+        {laws.loading && <LoadingBlock label="Memuat daftar undang-undang…" />}
 
-        {firstLaw && (
-          <p className="text-xs text-ink-muted">
-            {firstLaw.name} — versi {firstLaw.version}
-          </p>
+        {laws.data && laws.data.length === 0 && (
+          <p className="text-ink-muted">Katalog hukum belum diisi.</p>
         )}
 
-        {articles.data && articles.data.length > 0 && (
-          <div className="mt-3 space-y-3">
-            {articles.data.map((article) => (
-              <Card key={article.articleId} title={`Pasal ${article.number}`}>
-                {article.title && (
-                  <p className="mb-2 text-sm font-medium text-ink">{article.title}</p>
-                )}
-                <ul className="space-y-2">
-                  {article.paragraphs.map((paragraph) => (
-                    <li key={paragraph.paragraphId} className="text-sm text-ink-secondary">
-                      <span className="font-medium text-ink">Ayat ({paragraph.number}): </span>
-                      {paragraph.text}
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {articles.data && articles.data.length === 0 && (
-          <p className="text-ink-muted">Katalog pasal belum diisi.</p>
-        )}
+        {laws.data?.map((law) => <LawArticles key={law.versionId} law={law} />)}
       </Section>
 
       <Section title="Apa yang terjadi setelah laporan dikirim">
