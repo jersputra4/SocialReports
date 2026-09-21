@@ -3,8 +3,10 @@ import { OutboxEvent } from '@prisma/client';
 import { AppConfig, CONFIG_TOKEN } from '../common/config/configuration';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { signWebhook } from '../common/utils/crypto.util';
+import { formatArticleReference } from '../documents/komdigi-letter.builder';
 import { MailerService } from '../mailer/mailer.service';
 import { MailTemplates } from '../mailer/mail-templates';
+import { AdminNotifierService } from '../notifications/admin-notifier.service';
 import { OutboxPayload } from '../notifications/outbox.service';
 
 /**
@@ -29,6 +31,7 @@ export class OutboxDispatcherService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailer: MailerService,
+    private readonly adminNotifier: AdminNotifierService,
     @Inject(CONFIG_TOKEN) private readonly config: AppConfig,
   ) {}
 
@@ -72,6 +75,15 @@ export class OutboxDispatcherService {
     if (OutboxDispatcherService.USER_EMAIL_EVENTS.has(event.eventType)) {
       emailOk = await this.notifyReportOwner(event, payload, attempt);
     }
+
+    // Notifikasi admin sengaja TIDAK ikut menentukan keberhasilan event.
+    //
+    // Kanal pesan di luar sistem — Telegram, WhatsApp — bisa mati berjam-jam
+    // karena alasan yang tidak ada hubungannya dengan report. Bila kegagalan
+    // kanal itu menahan event, seluruh rantai notifikasi lain ikut tertunda
+    // dan akhirnya masuk dead-letter queue. Kegagalan tetap tercatat di
+    // notification_logs supaya dapat ditelusuri.
+    await this.notifyAdminChannel(event, attempt);
 
     if (n8nResult.ok && emailOk) {
       await this.prisma.outboxEvent.update({
@@ -181,6 +193,96 @@ export class OutboxDispatcherService {
   }
 
   /**
+   * Pemberitahuan ke kanal pesan admin.
+   *
+   * Detail report dibaca langsung dari basis data di sini, bukan diambil dari
+   * payload outbox. Payload itu memang minimal dan harus tetap begitu: ia
+   * dikirim ke zona Automation yang berada di luar kendali sistem. Notifikasi
+   * admin tidak melewati zona itu, jadi isinya boleh lebih lengkap tanpa
+   * melonggarkan apa pun yang sudah diputuskan.
+   *
+   * Identitas pelapor tidak pernah dibaca, apalagi dikirim.
+   */
+  private async notifyAdminChannel(event: OutboxEvent, attempt: number): Promise<void> {
+    if (!event.reportId) return;
+    if (!this.adminNotifier.handles(event.eventType)) return;
+    if (!this.adminNotifier.isEnabled()) return;
+
+    const report = await this.prisma.report.findUnique({
+      where: { id: event.reportId },
+      select: {
+        reportCode: true,
+        status: true,
+        description: true,
+        platformNameSnapshot: true,
+        actionType: { select: { name: true } },
+        targetSnapshot: { select: { originalUrl: true, canonicalUrl: true } },
+        policies: { select: { nameSnapshot: true, otherReason: true } },
+        legalBasis: {
+          select: {
+            lawNameSnapshot: true,
+            articleNumberSnapshot: true,
+            paragraphNumberSnapshot: true,
+            otherReason: true,
+          },
+        },
+        _count: { select: { evidences: true } },
+      },
+    });
+    if (!report) return;
+
+    const policyLabels = report.policies.map(
+      (policy) => policy.nameSnapshot || policy.otherReason || '',
+    );
+
+    const articleLabels = report.legalBasis.map((basis) => {
+      if (!basis.articleNumberSnapshot && basis.otherReason) return basis.otherReason;
+      const reference = formatArticleReference({
+        articleNumber: basis.articleNumberSnapshot,
+        paragraphNumber: basis.paragraphNumberSnapshot,
+      });
+      return `${basis.lawNameSnapshot} ${reference}`.trim();
+    });
+
+    const started = Date.now();
+    const result = await this.adminNotifier.notify({
+      reportCode: report.reportCode,
+      status: report.status,
+      targetUrl:
+        report.targetSnapshot?.canonicalUrl ?? report.targetSnapshot?.originalUrl ?? null,
+      platformName: report.platformNameSnapshot,
+      actionTypeName: report.actionType?.name ?? null,
+      policyLabels,
+      articleLabels,
+      description: report.description,
+      evidenceCount: report._count.evidences,
+      adminLink: `${this.config.publicUrl}/admin/report/${report.reportCode}`,
+      occurredAt: event.createdAt,
+    });
+
+    const channel = this.adminNotifier.channel;
+    if (!channel) return;
+
+    await this.log({
+      eventId: event.id,
+      channel,
+      // Nomor tujuan tidak pernah ditulis utuh ke log.
+      target: this.adminNotifier.maskedTarget,
+      ok: result.ok,
+      httpStatus: result.httpStatus,
+      detail: result.detail,
+      attempt,
+      durationMs: Date.now() - started,
+    });
+
+    if (!result.ok) {
+      this.logger.warn(
+        `Notifikasi admin gagal untuk ${report.reportCode} lewat ${channel}: ${result.detail}`,
+      );
+    }
+  }
+
+  /**
    * Backoff eksponensial: 1, 2, 4, 8, 16, 32, 64, 128 menit.
    * Setelah percobaan ke-8 event masuk dead-letter queue dan menunggu
    * tindakan manual admin (BRD 4.4).
@@ -221,7 +323,7 @@ export class OutboxDispatcherService {
 
   private async log(input: {
     eventId: string;
-    channel: 'N8N' | 'EMAIL_USER';
+    channel: 'N8N' | 'EMAIL_USER' | 'TELEGRAM_ADMIN' | 'WHATSAPP_ADMIN';
     target: string;
     ok: boolean;
     httpStatus?: number;

@@ -107,6 +107,8 @@ enum FetchStatus {
 enum NotificationChannel {
   EMAIL_USER
   N8N
+  TELEGRAM_ADMIN
+  WHATSAPP_ADMIN
 }
 
 enum NotificationResult {

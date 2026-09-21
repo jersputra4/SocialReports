@@ -30,6 +30,28 @@ function str(name: string, fallback?: string): string {
   return raw;
 }
 
+/**
+ * Nilai `ADMIN_NOTIFY_DRIVER` yang diterima.
+ *
+ * Salah ketik dimatikan menjadi `none` alih-alih menggagalkan boot. Notifikasi
+ * admin adalah kanal pendamping; satu huruf keliru di `.env` tidak boleh
+ * menjatuhkan seluruh API. Nilai yang tidak dikenali dilaporkan ke stderr agar
+ * tetap terlihat saat pemasangan.
+ */
+function parseAdminNotifyDriver(raw: string | undefined): 'none' | 'telegram' | 'whatsapp_cloud' {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (value === '' || value === 'none') return 'none';
+  if (value === 'telegram') return 'telegram';
+  if (value === 'whatsapp_cloud') return 'whatsapp_cloud';
+
+  // eslint-disable-next-line no-console
+  console.error(
+    `ADMIN_NOTIFY_DRIVER "${raw}" tidak dikenali; notifikasi admin dimatikan. ` +
+      `Nilai yang diterima: none, telegram, whatsapp_cloud.`,
+  );
+  return 'none';
+}
+
 export interface AppConfig {
   env: string;
   isProduction: boolean;
@@ -138,6 +160,42 @@ export interface AppConfig {
     maxAttachmentBytes: number;
     /** Pagar kecepatan: kiriman maksimum per 24 jam. */
     dailyLimit: number;
+  };
+
+  /**
+   * Notifikasi admin ke kanal luar (Telegram atau WhatsApp).
+   *
+   * Dikirim oleh worker, BUKAN lewat zona Automation. Zona itu tidak
+   * tersambung ke internet (`internal: true`) dan sengaja hanya menerima
+   * payload minimal, sehingga tidak dapat — dan tidak boleh — membawa URL
+   * target maupun kutipan kronologi.
+   *
+   * Bawaan `none`: pemasangan yang tidak mengisi apa pun tidak berubah
+   * perilakunya dan tidak mengirim ke mana pun.
+   */
+  adminNotify: {
+    driver: 'none' | 'telegram' | 'whatsapp_cloud';
+    /** Event outbox yang memicu notifikasi. */
+    events: string[];
+    /** Panjang kutipan kronologi; dibatasi lagi oleh modul penyusun pesan. */
+    excerptLength: number;
+    /** Batas waktu satu permintaan ke kanal tujuan. */
+    timeoutMs: number;
+    telegram: {
+      botToken: string;
+      chatId: string;
+    };
+    whatsapp: {
+      /** Versi Graph API, mis. `v21.0`. */
+      graphVersion: string;
+      phoneNumberId: string;
+      accessToken: string;
+      /** Nomor tujuan dalam format internasional tanpa tanda plus. */
+      recipient: string;
+      /** Nama template `utility` yang sudah disetujui Meta. */
+      templateName: string;
+      languageCode: string;
+    };
   };
 
   redisUrl: string;
@@ -260,6 +318,31 @@ export function loadConfiguration(): AppConfig {
       senderPhone: process.env.KOMDIGI_SENDER_PHONE || null,
       maxAttachmentBytes: int('KOMDIGI_MAX_ATTACHMENT_MB', 8) * 1024 * 1024,
       dailyLimit: int('KOMDIGI_DAILY_LIMIT', 20),
+    },
+
+    adminNotify: {
+      driver: parseAdminNotifyDriver(process.env.ADMIN_NOTIFY_DRIVER),
+      // Bawaan REPORT_CREATED: admin diberi tahu begitu report dibuat.
+      // Sebagian pemasangan lebih suka PAYMENT_VERIFIED, karena report yang
+      // belum dibayar sering ditinggalkan dan hanya menambah kebisingan.
+      events: str('ADMIN_NOTIFY_EVENTS', 'REPORT_CREATED')
+        .split(',')
+        .map((value) => value.trim().toUpperCase())
+        .filter((value) => value.length > 0),
+      excerptLength: int('ADMIN_NOTIFY_EXCERPT_LENGTH', 200),
+      timeoutMs: int('ADMIN_NOTIFY_TIMEOUT_MS', 10_000),
+      telegram: {
+        botToken: str('TELEGRAM_BOT_TOKEN', ''),
+        chatId: str('TELEGRAM_CHAT_ID', ''),
+      },
+      whatsapp: {
+        graphVersion: str('WHATSAPP_GRAPH_VERSION', 'v21.0'),
+        phoneNumberId: str('WHATSAPP_PHONE_NUMBER_ID', ''),
+        accessToken: str('WHATSAPP_ACCESS_TOKEN', ''),
+        recipient: str('ADMIN_WHATSAPP_NUMBER', ''),
+        templateName: str('WHATSAPP_TEMPLATE_NAME', 'report_baru'),
+        languageCode: str('WHATSAPP_TEMPLATE_LANGUAGE', 'id'),
+      },
     },
 
     redisUrl: str('REDIS_URL', 'redis://localhost:6379'),
