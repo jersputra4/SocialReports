@@ -1,5 +1,6 @@
 import { PropsWithChildren } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import ContactWhatsApp from './components/ContactWhatsApp';
 import { Layout } from './components/Layout';
 import { LoadingBlock } from './components/ui';
 import { useAuth } from './context/AuthContext';
@@ -63,7 +64,8 @@ function RedirectIfAuthenticated({ children }: PropsWithChildren) {
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <Routes>
       {/* Halaman publik */}
       <Route
         path="/masuk"
@@ -166,7 +168,13 @@ export default function App() {
         }
       />
 
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+
+      {/* Di luar <Routes> supaya tampil pada setiap halaman tanpa perlu
+          disisipkan satu per satu. Komponennya sendiri yang memutuskan kapan
+          menyembunyikan diri. */}
+      <ContactWhatsApp />
+    </>
   );
 }

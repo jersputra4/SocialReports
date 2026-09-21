@@ -66,13 +66,12 @@ services:
       retries: 20
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2024-09-22T00-33-43Z
+    image: ${MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2024-09-22T00-33-43Z}
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-srs_minio_admin}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-srs_minio_password}
-      MINIO_KMS_SECRET_KEY: ${MINIO_KMS_SECRET_KEY:-}
     volumes:
       - miniodata:/data
     networks: [data]
@@ -86,7 +85,7 @@ services:
       retries: 20
 
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2024-09-16T17-43-14Z
+    image: ${MINIO_MC_IMAGE:-quay.io/minio/mc:RELEASE.2024-09-16T17-43-14Z}
     depends_on:
       minio:
         condition: service_healthy
@@ -114,6 +113,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-srs}:${POSTGRES_PASSWORD:-srs_local_password}@postgres:5432/${POSTGRES_DB:-social_report}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_local_password}@redis:6379
       S3_ENDPOINT: http://minio:9000
+      # Alamat yang dipakai untuk menandatangani URL unduh; harus alamat yang
+      # benar-benar dapat dibuka peramban, bukan nama kontainer.
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://minio:9000}
       FETCHER_URL: http://fetcher:4001
     depends_on:
@@ -155,6 +156,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-srs}:${POSTGRES_PASSWORD:-srs_local_password}@postgres:5432/${POSTGRES_DB:-social_report}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_local_password}@redis:6379
       S3_ENDPOINT: http://minio:9000
+      # Alamat yang dipakai untuk menandatangani URL unduh; harus alamat yang
+      # benar-benar dapat dibuka peramban, bukan nama kontainer.
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://minio:9000}
       N8N_WEBHOOK_URL: http://automation:4002/webhook/report-events
     depends_on:
@@ -195,6 +198,9 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: /api/v1
+        # Kosong berarti tombol "Hubungi kami" tidak muncul.
+        VITE_WHATSAPP_NUMBER: ${WHATSAPP_CONTACT_NUMBER:-}
+        VITE_WHATSAPP_MESSAGE: ${WHATSAPP_CONTACT_MESSAGE:-}
     restart: unless-stopped
     networks: [public]
 
