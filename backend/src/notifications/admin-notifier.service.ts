@@ -6,6 +6,7 @@ import {
   buildAdminNotification,
   maskDestination,
 } from './admin-notification';
+import { OutboxEventType } from './outbox.service';
 
 /**
  * Kanal notifikasi admin ke aplikasi pesan.
@@ -32,7 +33,35 @@ import {
 export class AdminNotifierService {
   private readonly logger = new Logger(AdminNotifierService.name);
 
-  constructor(@Inject(CONFIG_TOKEN) private readonly config: AppConfig) {}
+  constructor(@Inject(CONFIG_TOKEN) private readonly config: AppConfig) {
+    this.warnOnUnknownEvents();
+  }
+
+  /**
+   * Memperingatkan nama event yang tidak dikenali di `ADMIN_NOTIFY_EVENTS`.
+   *
+   * Tanpa ini, satu salah ketik — `PAYMENT-VERIFIED` alih-alih
+   * `PAYMENT_VERIFIED` — membuat notifikasi diam total tanpa jejak apa pun:
+   * tidak ada baris di `notification_logs`, tidak ada galat, tidak ada
+   * peringatan. Kegagalan yang tidak bersuara jauh lebih mahal daripada
+   * kegagalan yang berteriak, karena yang mencarinya adalah manusia yang
+   * menduga kanalnya rusak.
+   */
+  private warnOnUnknownEvents(): void {
+    if (this.config.adminNotify.driver === 'none') return;
+
+    const dikenal = Object.keys(OutboxEventType);
+    const asing = this.config.adminNotify.events.filter(
+      (event) => !dikenal.includes(event),
+    );
+    if (asing.length === 0) return;
+
+    this.logger.warn(
+      `ADMIN_NOTIFY_EVENTS memuat nama event yang tidak dikenali: ${asing.join(', ')}. ` +
+        `Nama itu tidak akan pernah cocok, jadi notifikasinya tidak akan pernah terkirim. ` +
+        `Nilai yang diterima: ${dikenal.join(', ')}.`,
+    );
+  }
 
   /** Nama kanal untuk `notification_logs`. */
   get channel(): 'TELEGRAM_ADMIN' | 'WHATSAPP_ADMIN' | null {
